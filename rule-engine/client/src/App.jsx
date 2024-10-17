@@ -9,6 +9,7 @@ function RuleEngine() {
   const [result, setResult] = useState(null);
   const [rules, setRules] = useState([]);
   const [selectedRule, setSelectedRule] = useState('');
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     const fetchRules = async () => {
@@ -20,15 +21,53 @@ function RuleEngine() {
   }, []);
 
   const createRule = async () => {
-    const res = await fetch(`${BACKEND_URL}/create_rule`, {
-      method: 'POST',
-      body: JSON.stringify({ ruleString }),
-      headers: { 'Content-Type': 'application/json' }
-    });
-    const data = await res.json();
-    console.log('Rule created:', data);
-    setRules(prev => [...prev, data.rule]);
+    try {
+      const res = await fetch(`${BACKEND_URL}/create_rule`, {
+        method: 'POST',
+        body: JSON.stringify({ ruleString }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+  
+      if (!res.ok) {
+        const errorData = await res.json();
+        alert(`Error creating rule: ${errorData.error}`);
+        return;
+      }
+  
+      const data = await res.json();
+      console.log('Rule created:', data);
+      setRules(prev => [...prev, data.rule]);
+    } catch (error) {
+      console.error('Error:', error);
+    }
   };
+  
+  const updateRule = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/update_rule`, {
+        method: 'PUT',
+        body: JSON.stringify({ ruleId: selectedRule, ruleString }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+  
+      if (!res.ok) {
+        const errorData = await res.json();
+        alert(`Error updating rule: ${errorData.error}`);
+        return;
+      }
+  
+      const data = await res.json();
+      console.log('Rule updated:', data);
+      setRules((prev) => prev.map((rule) => (rule._id === selectedRule ? data.rule : rule)));
+  
+      setIsEditMode(false);
+      setRuleString('');
+      setSelectedRule('');
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+  
 
   const evaluateRule = async () => {
     if (!selectedRule) {
@@ -49,6 +88,16 @@ function RuleEngine() {
       mode: 'dark',
     },
   });
+
+  // Handle selecting a rule to modify
+  const handleSelectRule = (ruleId) => {
+    const ruleToEdit = rules.find((rule) => rule._id === ruleId);
+    if (ruleToEdit) {
+      setSelectedRule(ruleId);
+      setRuleString(ruleToEdit.ruleString);
+      setIsEditMode(true);
+    }
+  };
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -79,18 +128,25 @@ function RuleEngine() {
           onChange={(e) => setRuleString(e.target.value)}
           placeholder="Enter rule string"
         />
-        <Button variant="contained" color="primary" onClick={createRule} fullWidth>
-          Create Rule
-        </Button>
+
+        {!isEditMode ? (
+          <Button variant="contained" color="primary" onClick={createRule} fullWidth disabled={!ruleString}>
+            Create Rule
+          </Button>
+        ) : (
+          <Button variant="contained" color="primary" onClick={updateRule} fullWidth>
+            Update Rule
+          </Button>
+        )}
 
         <Select
           value={selectedRule}
-          onChange={(e) => setSelectedRule(e.target.value)}
+          onChange={(e) => handleSelectRule(e.target.value)}
           fullWidth
           displayEmpty
         >
           <MenuItem value="" disabled>
-            Select a rule to evaluate
+            Select a rule to modify or evaluate
           </MenuItem>
           {rules.map((rule) => (
             <MenuItem key={rule._id} value={rule._id}>
@@ -99,7 +155,6 @@ function RuleEngine() {
           ))}
         </Select>
 
-        {/* Test Data Input */}
         <TextField
           label="Test Data"
           multiline
@@ -114,7 +169,6 @@ function RuleEngine() {
           Evaluate Rule
         </Button>
 
-        {/* Result */}
         {result !== null && (
           <Typography variant="h6" color={result ? 'green' : 'red'}>
             Eligibility: {result ? 'Yes' : 'No'}
