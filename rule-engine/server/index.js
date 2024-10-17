@@ -16,22 +16,58 @@ app.use(
 
 app.use(express.json());
 
+const parseCondition = (conditionString) => {
+  const match = conditionString.match(/(\w+)\s*(>|<|=)\s*([^\s]+)/);
+  if (match) {
+    let operator;
+    switch (match[2]) {
+      case ">":
+        operator = "greaterThan";
+        break;
+      case "<":
+        operator = "lessThan";
+        break;
+      case "=":
+        operator = "equal";
+        break;
+      default:
+        throw new Error(`Unknown operator: ${match[2]}`);
+    }
+
+    const cleanValue = match[3].replace(/[()]/g, "");
+
+    return {
+      fact: match[1],
+      operator: operator,
+      value: isNaN(cleanValue)
+        ? cleanValue.replace(/['"]/g, "")
+        : Number(cleanValue),
+    };
+  }
+  throw new Error("Invalid condition: " + conditionString);
+};
+
 const create_rule = (ruleString) => {
+  const buildConditions = (rule) => {
+    const orParts = rule.split(/\sOR\s/i);
+    if (orParts.length > 1) {
+      return {
+        any: orParts.map((orPart) => buildConditions(orPart)),
+      };
+    }
+
+    const andParts = rule.split(/\sAND\s/i);
+    if (andParts.length > 1) {
+      return {
+        all: andParts.map((andPart) => parseCondition(andPart)),
+      };
+    }
+
+    return parseCondition(rule.trim());
+  };
+
   return {
-    conditions: {
-      any: [
-        {
-          fact: "age",
-          operator: "greaterThan",
-          value: 30,
-        },
-        {
-          fact: "department",
-          operator: "equal",
-          value: "Sales",
-        },
-      ],
-    },
+    conditions: buildConditions(ruleString),
     event: {
       type: "eligibility",
       params: {
@@ -48,11 +84,18 @@ app.get("/", (req, res) => {
 app.post("/create_rule", async (req, res) => {
   const { ruleString } = req.body;
 
-  const ast = create_rule(ruleString);
+  try {
+    const ast = create_rule(ruleString);
 
-  const rule = new Rule({ ruleString, ast });
-  await rule.save();
-  res.json({ rule });
+    console.log("Parsed AST:", JSON.stringify(ast, null, 2));
+
+    const rule = new Rule({ ruleString, ast });
+    await rule.save();
+
+    res.json({ rule });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
 
 app.post("/evaluate_rule", async (req, res) => {
@@ -69,6 +112,8 @@ app.post("/evaluate_rule", async (req, res) => {
     });
   }
 
+  console.log("Evaluating data:", JSON.stringify(data, null, 2));
+
   const engine = new Engine();
 
   try {
@@ -80,6 +125,7 @@ app.post("/evaluate_rule", async (req, res) => {
   engine
     .run(data)
     .then(({ events }) => {
+      console.log("Evaluation result:", events);
       if (events.length > 0) {
         res.json({ eligible: true });
       } else {
@@ -112,7 +158,6 @@ mongoose
     console.error(err);
   });
 
-// Start the server
 app.listen(3000, () => {
   console.log("Server running on port 3000");
 });
