@@ -1,6 +1,8 @@
 {
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^4.21.1",
+    "json-rules-engine": "^6.5.0",
     "mongoose": "^8.7.1",
     "nodemon": "^3.1.7"
   },
@@ -8,7 +10,6 @@
   "name": "rule-engine-server",
   "version": "1.0.0",
   "main": "index.js",
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
