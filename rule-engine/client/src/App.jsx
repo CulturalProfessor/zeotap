@@ -27,21 +27,19 @@ function RuleEngine() {
         body: JSON.stringify({ ruleString }),
         headers: { 'Content-Type': 'application/json' }
       });
-  
       if (!res.ok) {
         const errorData = await res.json();
         alert(`Error creating rule: ${errorData.error}`);
         return;
       }
-  
       const data = await res.json();
-      console.log('Rule created:', data);
       setRules(prev => [...prev, data.rule]);
+      setRuleString('');
     } catch (error) {
       console.error('Error:', error);
     }
   };
-  
+
   const updateRule = async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/update_rule`, {
@@ -49,25 +47,18 @@ function RuleEngine() {
         body: JSON.stringify({ ruleId: selectedRule, ruleString }),
         headers: { 'Content-Type': 'application/json' }
       });
-  
       if (!res.ok) {
         const errorData = await res.json();
         alert(`Error updating rule: ${errorData.error}`);
         return;
       }
-  
       const data = await res.json();
-      console.log('Rule updated:', data);
-      setRules((prev) => prev.map((rule) => (rule._id === selectedRule ? data.rule : rule)));
-  
-      setIsEditMode(false);
-      setRuleString('');
-      setSelectedRule('');
+      setRules(prev => prev.map(rule => (rule._id === selectedRule ? data.rule : rule)));
+      resetForm();
     } catch (error) {
       console.error('Error:', error);
     }
   };
-  
 
   const evaluateRule = async () => {
     if (!selectedRule) {
@@ -89,14 +80,19 @@ function RuleEngine() {
     },
   });
 
-  // Handle selecting a rule to modify
   const handleSelectRule = (ruleId) => {
-    const ruleToEdit = rules.find((rule) => rule._id === ruleId);
+    const ruleToEdit = rules.find(rule => rule._id === ruleId);
     if (ruleToEdit) {
       setSelectedRule(ruleId);
       setRuleString(ruleToEdit.ruleString);
       setIsEditMode(true);
     }
+  };
+
+  const resetForm = () => {
+    setSelectedRule('');
+    setRuleString('');
+    setIsEditMode(false);
   };
 
   return (
@@ -134,9 +130,14 @@ function RuleEngine() {
             Create Rule
           </Button>
         ) : (
-          <Button variant="contained" color="primary" onClick={updateRule} fullWidth>
-            Update Rule
-          </Button>
+          <>
+            <Button variant="contained" color="primary" onClick={updateRule} fullWidth>
+              Update Rule
+            </Button>
+            <Button variant="outlined" color="secondary" onClick={resetForm} fullWidth>
+              Deselect Rule
+            </Button>
+          </>
         )}
 
         <Select
